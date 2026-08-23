@@ -1,0 +1,41 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Arduino / ESP32 build artifacts
+*.bin
+*.elf
+*.map
+*.hex
+/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local configs
+*.env
+# ROS 2 / colcon
+build/
+install/
+log/
+.colcon/
+
+# Editors / IDEs
+.vscode/
+.idea/
+
+# Arduino / PlatformIO additional
+.pio/
+.pioenvs/
+.piolibdeps/
+.platformio/
+*.ino~
+*.arduino.*
+arduino_build_*/
+arduino_cache_*/
+
+# Python extras
+*.egg-info/
+dist/
