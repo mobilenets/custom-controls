@@ -156,6 +156,16 @@ void app_main(void)
 
     int count = 0;
 
+    printf("\nInitializing Wi-Fi...\n");
+
+    esp_err_t wifi_result = wifi_init_sta();
+
+    if (wifi_result == ESP_OK) {
+        printf("Wi-Fi status: CONNECTED\n");
+    } else {
+        printf("Wi-Fi status: FAILED\n");
+    }
+
     while (1) {
         printf("FCN alive: %d\n", count++);
         vTaskDelay(pdMS_TO_TICKS(1000));
