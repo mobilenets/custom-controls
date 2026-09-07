@@ -6,7 +6,7 @@
 #include "esp_err.h"
 #include "esp_heap_caps.h"
 #include "esp_camera.h"
-
+#include "wifi.h"
 /*
  * AI-Thinker ESP32-CAM pin assignment
  */
