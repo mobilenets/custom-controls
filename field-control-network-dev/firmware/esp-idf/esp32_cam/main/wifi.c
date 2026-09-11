@@ -12,8 +12,7 @@
 
 #include "wifi.h"
 
-#define WIFI_SSID "YOUR_WIFI_NAME"
-#define WIFI_PASS "YOUR_WIFI_PASSWORD"
+#include "wifi_credentials.h"
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1

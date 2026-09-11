@@ -39,3 +39,9 @@ arduino_cache_*/
 # Python extras
 *.egg-info/
 dist/
+
+# ESP-IDF generated component downloads
+managed_components/
+*/managed_components/
+
+wifi_credentials.h

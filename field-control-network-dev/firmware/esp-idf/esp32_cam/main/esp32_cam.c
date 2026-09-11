@@ -7,6 +7,7 @@
 #include "esp_heap_caps.h"
 #include "esp_camera.h"
 #include "wifi.h"
+#include "web_server.h"
 /*
  * AI-Thinker ESP32-CAM pin assignment
  */
@@ -164,6 +165,23 @@ void app_main(void)
         printf("Wi-Fi status: CONNECTED\n");
     } else {
         printf("Wi-Fi status: FAILED\n");
+    }
+
+    if (wifi_result == ESP_OK) {
+
+        printf("\nStarting camera web server...\n");
+
+        esp_err_t web_result =
+            web_server_start();
+
+        if (web_result == ESP_OK) {
+
+            printf("Web server: RUNNING\n");
+
+        } else {
+
+            printf("Web server: FAILED\n");
+        }
     }
 
     while (1) {
