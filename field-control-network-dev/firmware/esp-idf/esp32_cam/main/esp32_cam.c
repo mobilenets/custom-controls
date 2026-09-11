@@ -8,6 +8,9 @@
 #include "esp_camera.h"
 #include "wifi.h"
 #include "web_server.h"
+
+#include "micro_ros_node.h"
+
 /*
  * AI-Thinker ESP32-CAM pin assignment
  */
@@ -183,7 +186,9 @@ void app_main(void)
             printf("Web server: FAILED\n");
         }
     }
-
+    printf("Starting micro-ROS...\n");
+    micro_ros_start();
+    
     while (1) {
         printf("FCN alive: %d\n", count++);
         vTaskDelay(pdMS_TO_TICKS(1000));

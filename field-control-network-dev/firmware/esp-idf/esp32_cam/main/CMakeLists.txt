@@ -3,6 +3,7 @@ idf_component_register(
         "esp32_cam.c"
         "wifi.c"
         "web_server.c"
+        "micro_ros_node.c"
 
     INCLUDE_DIRS
         "."
@@ -13,4 +14,5 @@ idf_component_register(
         esp_netif
         esp_event
         nvs_flash
+        micro_ros_espidf_component
 )
