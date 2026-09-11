@@ -1,0 +1,4 @@
+[submodule "field-control-network-dev/firmware/esp-idf/esp32_cam/components/micro_ros_espidf_component"]
+	path = field-control-network-dev/firmware/esp-idf/esp32_cam/components/micro_ros_espidf_component
+	url = https://github.com/micro-ROS/micro_ros_espidf_component.git
+	branch = humble
