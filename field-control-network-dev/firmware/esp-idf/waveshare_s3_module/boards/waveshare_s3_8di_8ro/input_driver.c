@@ -5,7 +5,8 @@
 #include "esp_log.h"
 
 #include <stdint.h>
-
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "input_driver";
 
@@ -106,4 +107,74 @@ uint8_t fcn_input_get_mask(void)
 
 
     return mask;
+}
+
+#define FCN_INPUT_SCAN_INTERVAL_MS 50
+
+static void input_monitor_task(void *arg)
+{
+    uint8_t last_mask = fcn_input_get_mask();
+
+    ESP_LOGI(
+        TAG,
+        "Input monitor started, initial mask=0x%02X",
+        last_mask
+    );
+
+    while (1)
+    {
+        uint8_t current_mask = fcn_input_get_mask();
+
+        if (current_mask != last_mask)
+        {
+            uint8_t changed = current_mask ^ last_mask;
+
+            for (uint8_t i = 0; i < FCN_DIGITAL_INPUT_COUNT; i++)
+            {
+                uint8_t bit = (1U << i);
+
+                if (changed & bit)
+                {
+                    int level = (current_mask & bit) ? 1 : 0;
+
+                    ESP_LOGI(
+                        TAG,
+                        "Input %u changed -> %d",
+                        i + 1,
+                        level
+                    );
+                }
+            }
+
+            ESP_LOGI(
+                TAG,
+                "Input mask: 0x%02X",
+                current_mask
+            );
+
+            last_mask = current_mask;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(FCN_INPUT_SCAN_INTERVAL_MS));
+    }
+}
+
+esp_err_t fcn_input_start_monitor(void)
+{
+    BaseType_t result = xTaskCreate(
+        input_monitor_task,
+        "fcn_input_monitor",
+        3072,
+        NULL,
+        5,
+        NULL
+    );
+
+    if (result != pdPASS)
+    {
+        ESP_LOGE(TAG, "Failed to start input monitor task");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
 }

@@ -28,6 +28,8 @@ int fcn_input_get(uint8_t input_number);
  */
 uint8_t fcn_input_get_mask(void);
 
+esp_err_t fcn_input_start_monitor(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -151,26 +151,24 @@ void app_main(void)
 
     esp_err_t input_err = fcn_input_init();
 
-    if (input_err == ESP_OK)
+   if (input_err == ESP_OK)
     {
         uint8_t input_mask = fcn_input_get_mask();
 
         ESP_LOGI(
             TAG,
-            "Digital input mask: 0x%02X",
+            "Initial digital input mask: 0x%02X",
             input_mask
         );
 
+        esp_err_t monitor_err = fcn_input_start_monitor();
 
-        for (uint8_t input = 1;
-            input <= FCN_DIGITAL_INPUT_COUNT;
-            input++)
+        if (monitor_err != ESP_OK)
         {
-            ESP_LOGI(
+            ESP_LOGE(
                 TAG,
-                "Input %u = %d",
-                input,
-                fcn_input_get(input)
+                "Failed to start input monitor: %s",
+                esp_err_to_name(monitor_err)
             );
         }
     }
