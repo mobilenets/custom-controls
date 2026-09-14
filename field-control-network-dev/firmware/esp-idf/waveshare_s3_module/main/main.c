@@ -8,6 +8,9 @@
 #include "fcn_config.h"
 #include "fcn_relay.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 static const char *TAG = "FCN";
 
 
@@ -92,6 +95,56 @@ void app_main(void)
         );
     }
 
+    if (relay_err == ESP_OK)
+    {
+        ESP_LOGI(TAG, "--- Controlled relay test ---");
+
+        ESP_LOGI(TAG, "Relay 1 ON");
+
+        esp_err_t test_err = fcn_relay_set(1, true);
+
+        if (test_err == ESP_OK)
+        {
+            ESP_LOGI(
+                TAG,
+                "Relay mask: 0x%02X",
+                fcn_relay_get_mask()
+            );
+        }
+        else
+        {
+            ESP_LOGE(
+                TAG,
+                "Failed to turn relay 1 ON: %s",
+                esp_err_to_name(test_err)
+            );
+        }
+
+
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
+
+        ESP_LOGI(TAG, "Relay 1 OFF");
+
+        test_err = fcn_relay_set(1, false);
+
+        if (test_err == ESP_OK)
+        {
+            ESP_LOGI(
+                TAG,
+                "Relay mask: 0x%02X",
+                fcn_relay_get_mask()
+            );
+        }
+        else
+        {
+            ESP_LOGE(
+                TAG,
+                "Failed to turn relay 1 OFF: %s",
+                esp_err_to_name(test_err)
+            );
+        }
+    }
 
 
     ESP_LOGI(TAG, "FCN initialization complete.");
