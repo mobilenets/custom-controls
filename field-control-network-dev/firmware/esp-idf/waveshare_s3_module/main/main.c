@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 
 #include "fcn_input.h"
+#include "fcn_network.h"
 static const char *TAG = "FCN";
 
 
@@ -178,6 +179,23 @@ void app_main(void)
             TAG,
             "Digital input subsystem failed: %s",
             esp_err_to_name(input_err)
+        );
+    }
+
+    ESP_LOGI(TAG, "--- Network subsystem ---");
+
+    esp_err_t network_err = fcn_network_init();
+
+    if (network_err == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Ethernet initialization started");
+    }
+    else
+    {
+        ESP_LOGE(
+            TAG,
+            "Ethernet initialization failed: %s",
+            esp_err_to_name(network_err)
         );
     }
 
