@@ -21,4 +21,5 @@ idf_component_register(
         esp_netif
         esp_event
         spi_flash
+        esp_wifi
 )
