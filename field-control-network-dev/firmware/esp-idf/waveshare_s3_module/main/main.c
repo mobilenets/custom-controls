@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "fcn_input.h"
 static const char *TAG = "FCN";
 
 
@@ -95,7 +96,7 @@ void app_main(void)
         );
     }
 
-    if (relay_err == ESP_OK)
+    /* if (relay_err == ESP_OK)
     {
         ESP_LOGI(TAG, "--- Controlled relay test ---");
 
@@ -144,8 +145,43 @@ void app_main(void)
                 esp_err_to_name(test_err)
             );
         }
-    }
+    } */
 
+    ESP_LOGI(TAG, "--- Digital input subsystem ---");
+
+    esp_err_t input_err = fcn_input_init();
+
+    if (input_err == ESP_OK)
+    {
+        uint8_t input_mask = fcn_input_get_mask();
+
+        ESP_LOGI(
+            TAG,
+            "Digital input mask: 0x%02X",
+            input_mask
+        );
+
+
+        for (uint8_t input = 1;
+            input <= FCN_DIGITAL_INPUT_COUNT;
+            input++)
+        {
+            ESP_LOGI(
+                TAG,
+                "Input %u = %d",
+                input,
+                fcn_input_get(input)
+            );
+        }
+    }
+    else
+    {
+        ESP_LOGE(
+            TAG,
+            "Digital input subsystem failed: %s",
+            esp_err_to_name(input_err)
+        );
+    }
 
     ESP_LOGI(TAG, "FCN initialization complete.");
 }
