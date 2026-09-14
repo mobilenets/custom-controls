@@ -6,7 +6,7 @@
 
 #include "board_profile.h"
 #include "fcn_config.h"
-
+#include "fcn_relay.h"
 
 static const char *TAG = "FCN";
 
@@ -70,6 +70,29 @@ void app_main(void)
     ESP_LOGI(TAG,
              "Default micro-ROS agent port: %u",
              config.agent_port);
+
+    ESP_LOGI(TAG, "--- Onboard relay subsystem ---");
+
+    esp_err_t relay_err = fcn_relay_init();
+
+    if (relay_err == ESP_OK) {
+
+        ESP_LOGI(
+            TAG,
+            "Relay subsystem ready, mask=0x%02X",
+            fcn_relay_get_mask()
+        );
+
+    } else {
+
+        ESP_LOGE(
+            TAG,
+            "Relay subsystem initialization failed: %s",
+            esp_err_to_name(relay_err)
+        );
+    }
+
+
 
     ESP_LOGI(TAG, "FCN initialization complete.");
 }
