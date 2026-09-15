@@ -18,6 +18,9 @@
 #include "fcn_config_console.h"
 #include "fcn_config_boot.h"
 
+#include "fcn_microros.h"
+#include "fcn_status.h"
+
 static const char *TAG = "FCN";
 
 static fcn_config_t g_config;
@@ -261,6 +264,26 @@ void app_main(void)
         );
     }
 
+    ESP_LOGI(TAG, "--- Status subsystem ---");
+
+    esp_err_t status_err = fcn_status_init();
+
+    if (status_err != ESP_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Status subsystem initialization failed: %s",
+            esp_err_to_name(status_err)
+        );
+    }
+    else
+    {
+        ESP_LOGI(
+            TAG,
+            "Status subsystem ready"
+        );
+    }
+
     ESP_LOGI(TAG, "--- Network subsystem ---");
 
     fcn_network_config_t network_config = {
@@ -296,5 +319,40 @@ void app_main(void)
         );
     }
 
+    ESP_LOGI(TAG, "--- micro-ROS subsystem ---");
+
+    fcn_microros_config_t microros_config = {
+        .agent_ip =
+            g_config.agent_ip,
+
+        .agent_port =
+            g_config.agent_port,
+
+        .module_id =
+            g_config.module_id,
+
+        .module_name =
+            g_config.module_name
+    };
+
+    esp_err_t microros_err =
+        fcn_microros_start(&microros_config);
+
+    if (microros_err == ESP_OK)
+    {
+        ESP_LOGI(
+            TAG,
+            "micro-ROS manager started"
+        );
+    }
+    else
+    {
+        ESP_LOGE(
+            TAG,
+            "micro-ROS initialization failed: %s",
+            esp_err_to_name(microros_err)
+        );
+    }
+    
     ESP_LOGI(TAG, "FCN initialization complete.");
 }

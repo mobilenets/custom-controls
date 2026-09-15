@@ -14,6 +14,8 @@ idf_component_register(
         fcn_config
         fcn_io
         fcn_network
+        fcn_microros
+        fcn_status
         esp_driver_i2c
         esp_driver_gpio
         esp_driver_spi
