@@ -8,5 +8,6 @@ idf_component_register(
     REQUIRES
         fcn_network
         fcn_status
+        fcn_io
         micro_ros_espidf_component
 )

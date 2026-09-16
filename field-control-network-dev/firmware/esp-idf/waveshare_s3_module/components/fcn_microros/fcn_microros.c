@@ -14,7 +14,14 @@
 
 #include <rcl/rcl.h>
 #include <rclc/rclc.h>
+#include <rclc/executor.h>
 #include <rmw_microros/rmw_microros.h>
+
+#include <std_msgs/msg/string.h>
+
+
+#include "fcn_relay.h"
+#include "fcn_input.h"
 
 #include "fcn_status.h"
 
@@ -26,6 +33,7 @@
 #define CONNECTED_LOOP_DELAY_MS     100
 #define AGENT_HEALTH_INTERVAL_MS    1000
 
+#define ACTIONREQUEST_BUFFER_SIZE 64
 
 static const char *TAG = "fcn_microros";
 
@@ -45,15 +53,35 @@ static rcl_init_options_t init_options;
 static rclc_support_t support;
 static rcl_node_t node;
 
+static rcl_subscription_t actionrequest_subscriber;
+static rclc_executor_t executor;
+
+static std_msgs__msg__String actionrequest_msg;
+
+static rcl_publisher_t modulereturn_publisher;
+static std_msgs__msg__String modulereturn_msg;
+
+#define MODULERETURN_BUFFER_SIZE 128
+static char modulereturn_buffer[MODULERETURN_BUFFER_SIZE];
+
 static bool init_options_initialized = false;
 static bool support_initialized = false;
 static bool node_initialized = false;
+
+static bool actionrequest_initialized = false;
+static bool executor_initialized = false;
+
+static bool modulereturn_initialized = false;
 
 static volatile bool agent_connected = false;
 
 static char agent_ip[16];
 static char agent_port[6];
 static char node_name[32];
+
+static char actionrequest_buffer[ACTIONREQUEST_BUFFER_SIZE];
+
+static uint8_t local_module_id = 0;
 
 
 static void reset_ros_handles(void)
@@ -65,6 +93,19 @@ static void reset_ros_handles(void)
 
     node =
         rcl_get_zero_initialized_node();
+
+    actionrequest_subscriber =
+        rcl_get_zero_initialized_subscription();
+    
+    modulereturn_publisher =
+        rcl_get_zero_initialized_publisher();
+
+    executor =
+        rclc_executor_get_zero_initialized_executor();
+
+    actionrequest_initialized = false;
+    modulereturn_initialized = false;
+    executor_initialized = false;
 
     init_options_initialized = false;
     support_initialized = false;
@@ -160,6 +201,190 @@ static bool ping_agent(void)
     );
 }
 
+static void actionrequest_callback(const void *msgin)
+{
+    
+    const std_msgs__msg__String *msg =
+        (const std_msgs__msg__String *)msgin;
+
+    if (msg == NULL || msg->data.data == NULL)
+    {
+        ESP_LOGW(TAG, "Empty /actionrequest received");
+        return;
+    }
+
+    ESP_LOGI(
+            TAG,
+            "Received /actionrequest: '%s'",
+            msg->data.data
+        );
+
+    unsigned int module_id = 0;
+    unsigned int relay_number = 0;
+    char command[8] = {0};
+    char extra = '\0';
+
+    int fields = sscanf(
+        msg->data.data,
+        "%u;%u;%7[^;];%c",
+        &module_id,
+        &relay_number,
+        command,
+        &extra
+    );
+
+    if (fields != 3)
+    {
+        ESP_LOGW(
+            TAG,
+            "Invalid /actionrequest: '%s'",
+            msg->data.data
+        );
+
+        return;
+    }
+
+    if (module_id != local_module_id)
+    {
+        ESP_LOGD(
+            TAG,
+            "Ignoring command for module %u",
+            module_id
+        );
+
+        return;
+    }
+
+    if (relay_number < 1 || relay_number > 8)
+    {
+        ESP_LOGW(
+            TAG,
+            "Invalid relay number: %u",
+            relay_number
+        );
+
+        return;
+    }
+
+    bool requested_state;
+
+    if (strcmp(command, "ON") == 0)
+    {
+        requested_state = true;
+    }
+    else if (strcmp(command, "OFF") == 0)
+    {
+        requested_state = false;
+    }
+    else
+    {
+        ESP_LOGW(
+            TAG,
+            "Invalid relay command: '%s'",
+            command
+        );
+
+        return;
+    }
+
+    esp_err_t err =
+        fcn_relay_set(
+            (uint8_t)relay_number,
+            requested_state
+        );
+
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Relay %u command failed: %s",
+            relay_number,
+            esp_err_to_name(err)
+        );
+
+        return;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "Action accepted: module=%u relay=%u state=%s",
+        module_id,
+        relay_number,
+        requested_state ? "ON" : "OFF"
+    );
+}
+
+static void publish_modulereturn(void)
+{
+    if (!modulereturn_initialized)
+    {
+        return;
+    }
+
+    uint8_t relay_mask =
+        fcn_relay_get_mask();
+
+    uint8_t input_mask =
+        fcn_input_get_mask();
+
+    int written = snprintf(
+        modulereturn_buffer,
+        sizeof(modulereturn_buffer),
+        "%u;R:%u,%u,%u,%u,%u,%u,%u,%u;"
+        "I:%u,%u,%u,%u,%u,%u,%u,%u",
+        local_module_id,
+
+        (relay_mask >> 0) & 0x01,
+        (relay_mask >> 1) & 0x01,
+        (relay_mask >> 2) & 0x01,
+        (relay_mask >> 3) & 0x01,
+        (relay_mask >> 4) & 0x01,
+        (relay_mask >> 5) & 0x01,
+        (relay_mask >> 6) & 0x01,
+        (relay_mask >> 7) & 0x01,
+
+        (input_mask >> 0) & 0x01,
+        (input_mask >> 1) & 0x01,
+        (input_mask >> 2) & 0x01,
+        (input_mask >> 3) & 0x01,
+        (input_mask >> 4) & 0x01,
+        (input_mask >> 5) & 0x01,
+        (input_mask >> 6) & 0x01,
+        (input_mask >> 7) & 0x01
+    );
+
+    if (
+        written < 0 ||
+        written >= sizeof(modulereturn_buffer)
+    )
+    {
+        ESP_LOGE(
+            TAG,
+            "/modulereturn buffer overflow"
+        );
+
+        return;
+    }
+
+    modulereturn_msg.data.size =
+        (size_t)written;
+
+    rcl_ret_t rc =
+        rcl_publish(
+            &modulereturn_publisher,
+            &modulereturn_msg,
+            NULL
+        );
+
+    if (rc != RCL_RET_OK)
+    {
+        ESP_LOGW(
+            TAG,
+            "/modulereturn publish failed: %d",
+            (int)rc
+        );
+    }
+}
 
 static bool create_entities(void)
 {
@@ -219,6 +444,151 @@ static bool create_entities(void)
         node_name
     );
 
+    actionrequest_subscriber =
+        rcl_get_zero_initialized_subscription();
+
+    rc = rclc_subscription_init_best_effort(
+        &actionrequest_subscriber,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(
+            std_msgs,
+            msg,
+            String
+        ),
+        "/actionrequest"
+    );
+
+    if (rc != RCL_RET_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Failed to create /actionrequest subscriber: %d",
+            (int)rc
+        );
+
+        return false;
+    }
+
+    actionrequest_initialized = true;
+
+
+    memset(
+        &actionrequest_msg,
+        0,
+        sizeof(actionrequest_msg)
+    );
+
+    /*
+    * Preallocate the String storage so incoming ROS messages
+    * do not depend on repeated heap allocation.
+    */
+    actionrequest_msg.data.data =
+        actionrequest_buffer;
+
+    actionrequest_msg.data.size = 0;
+
+    actionrequest_msg.data.capacity =
+        sizeof(actionrequest_buffer);
+
+    actionrequest_buffer[0] = '\0';
+
+
+    executor =
+        rclc_executor_get_zero_initialized_executor();
+
+    rc = rclc_executor_init(
+        &executor,
+        &support.context,
+        1,
+        &allocator
+    );
+
+    if (rc != RCL_RET_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Failed to initialize executor: %d",
+            (int)rc
+        );
+
+        return false;
+    }
+
+    executor_initialized = true;
+
+
+    rc = rclc_executor_add_subscription(
+        &executor,
+        &actionrequest_subscriber,
+        &actionrequest_msg,
+        &actionrequest_callback,
+        ON_NEW_DATA
+    );
+
+    if (rc != RCL_RET_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Failed to add /actionrequest to executor: %d",
+            (int)rc
+        );
+
+        return false;
+    }
+
+    ESP_LOGI(
+        TAG,
+        "Subscribed to /actionrequest"
+    );
+
+    modulereturn_publisher =
+        rcl_get_zero_initialized_publisher();
+
+    rc = rclc_publisher_init_best_effort(
+        &modulereturn_publisher,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(
+            std_msgs,
+            msg,
+            String
+        ),
+        "/modulereturn"
+    );
+
+    if (rc != RCL_RET_OK)
+    {
+        ESP_LOGE(
+            TAG,
+            "Failed to create /modulereturn publisher: %d",
+            (int)rc
+        );
+
+        return false;
+    }
+
+    modulereturn_initialized = true;
+
+    memset(
+        &modulereturn_msg,
+        0,
+        sizeof(modulereturn_msg)
+    );
+
+    modulereturn_msg.data.data =
+        modulereturn_buffer;
+
+    modulereturn_msg.data.size = 0;
+
+    modulereturn_msg.data.capacity =
+        sizeof(modulereturn_buffer);
+
+    modulereturn_buffer[0] = '\0';
+
+    ESP_LOGI(
+        TAG,
+        "Publishing /modulereturn"
+    );
+
     return true;
 }
 
@@ -257,6 +627,61 @@ static void destroy_entities(void)
                 0
             );
         }
+    }
+
+    if (executor_initialized)
+    {
+        rc = rclc_executor_fini(&executor);
+
+        if (rc != RCL_RET_OK)
+        {
+            ESP_LOGW(
+                TAG,
+                "executor fini failed: %d",
+                (int)rc
+            );
+        }
+
+        executor_initialized = false;
+    }
+
+    if (modulereturn_initialized)
+    {
+        rc = rcl_publisher_fini(
+            &modulereturn_publisher,
+            &node
+        );
+
+        if (rc != RCL_RET_OK)
+        {
+            ESP_LOGW(
+                TAG,
+                "modulereturn publisher fini failed: %d",
+                (int)rc
+            );
+        }
+
+        modulereturn_initialized = false;
+    }
+
+
+    if (actionrequest_initialized)
+    {
+        rc = rcl_subscription_fini(
+            &actionrequest_subscriber,
+            &node
+        );
+
+        if (rc != RCL_RET_OK)
+        {
+            ESP_LOGW(
+                TAG,
+                "actionrequest subscriber fini failed: %d",
+                (int)rc
+            );
+        }
+
+        actionrequest_initialized = false;
     }
 
     if (node_initialized)
@@ -331,6 +756,9 @@ static void micro_ros_task(void *arg)
 
     TickType_t last_health_check =
         xTaskGetTickCount();
+
+    TickType_t last_modulereturn =
+    xTaskGetTickCount();
 
     ESP_LOGI(
         TAG,
@@ -416,6 +844,9 @@ static void micro_ros_task(void *arg)
                     last_health_check =
                         xTaskGetTickCount();
 
+                    last_modulereturn =
+                        xTaskGetTickCount();
+
                     agent_connected = true;
 
                     fcn_status_set(FCN_STATUS_AGENT_CONNECTED);
@@ -454,6 +885,34 @@ static void micro_ros_task(void *arg)
             {
                 TickType_t now =
                     xTaskGetTickCount();
+
+                rcl_ret_t spin_rc =
+                    rclc_executor_spin_some(
+                        &executor,
+                        RCL_MS_TO_NS(10)
+                    );
+
+                if (
+                    now - last_modulereturn >=
+                    pdMS_TO_TICKS(1000)
+                )
+                {
+                    publish_modulereturn();
+
+                    last_modulereturn = now;
+                }
+
+                if (
+                    spin_rc != RCL_RET_OK &&
+                    spin_rc != RCL_RET_TIMEOUT
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Executor spin returned: %d",
+                        (int)spin_rc
+                    );
+                }
 
                 if (!fcn_network_has_ip())
                 {
@@ -606,6 +1065,9 @@ esp_err_t fcn_microros_start(
         "fcn_module_%u",
         config->module_id
     );
+
+    local_module_id =
+        config->module_id;
 
     BaseType_t task_result =
         xTaskCreate(
