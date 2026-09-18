@@ -1,4 +1,3 @@
-
 idf_component_register(
     SRCS
         "main.c"
@@ -6,7 +5,6 @@ idf_component_register(
         "../boards/waveshare_s3_8di_8ro/rs485_relay_driver.c"
         "../boards/waveshare_s3_8di_8ro/input_driver.c"
         "../boards/waveshare_s3_8di_8ro/network_driver.c"
-        
 
     INCLUDE_DIRS
         "."
@@ -28,5 +26,4 @@ idf_component_register(
         esp_event
         spi_flash
         esp_wifi
-        
 )
