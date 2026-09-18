@@ -82,6 +82,7 @@ static char node_name[32];
 static char actionrequest_buffer[ACTIONREQUEST_BUFFER_SIZE];
 
 static uint8_t local_module_id = 0;
+static uint8_t local_input_count = 0;
 static uint8_t local_output_count = 0;
 
 static void reset_ros_handles(void)
@@ -425,21 +426,13 @@ static void publish_modulereturn(void)
     }
 
     /*
-     * Inputs remain the existing eight-input
-     * Waveshare representation for this milestone.
-     */
+    * Input states are dynamic according
+    * to the configured FCN input count.
+    */
     written = snprintf(
         modulereturn_buffer + used,
         sizeof(modulereturn_buffer) - used,
-        ";I:%u,%u,%u,%u,%u,%u,%u,%u",
-        (input_mask >> 0) & 0x01,
-        (input_mask >> 1) & 0x01,
-        (input_mask >> 2) & 0x01,
-        (input_mask >> 3) & 0x01,
-        (input_mask >> 4) & 0x01,
-        (input_mask >> 5) & 0x01,
-        (input_mask >> 6) & 0x01,
-        (input_mask >> 7) & 0x01
+        ";I:"
     );
 
     if (
@@ -457,6 +450,40 @@ static void publish_modulereturn(void)
     }
 
     used += (size_t)written;
+
+    for (
+        uint8_t input_number = 1;
+        input_number <= local_input_count;
+        input_number++
+    )
+    {
+        int state =
+            (input_mask >> (input_number - 1)) & 0x01;
+
+        written = snprintf(
+            modulereturn_buffer + used,
+            sizeof(modulereturn_buffer) - used,
+            "%s%d",
+            input_number > 1 ? "," : "",
+            state
+        );
+
+        if (
+            written < 0 ||
+            (size_t)written >=
+                (sizeof(modulereturn_buffer) - used)
+        )
+        {
+            ESP_LOGE(
+                TAG,
+                "/modulereturn buffer overflow"
+            );
+
+            return;
+        }
+
+        used += (size_t)written;
+    }
 
     modulereturn_msg.data.size =
         used;
@@ -1160,6 +1187,9 @@ esp_err_t fcn_microros_start(
 
     local_module_id =
         config->module_id;
+
+    local_input_count =
+        config->input_count;
 
     local_output_count =
         config->output_count;

@@ -3,6 +3,8 @@ idf_component_register(
         "main.c"
         "../boards/gledopto_gl_c_618wl/output_driver.c"
         "../boards/gledopto_gl_c_618wl/network_driver.c"
+        "../boards/gledopto_gl_c_618wl/input_driver.c"
+        "../boards/gledopto_gl_c_618wl/status_driver.c"
 
     INCLUDE_DIRS
         "."
@@ -11,6 +13,7 @@ idf_component_register(
     REQUIRES
         fcn_io
         fcn_config
+        fcn_microros
         esp_driver_gpio
         spi_flash
         fcn_network

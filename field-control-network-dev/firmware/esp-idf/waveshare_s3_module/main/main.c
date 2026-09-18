@@ -369,6 +369,9 @@ void app_main(void)
         .module_name =
             g_config.module_name,
 
+        .input_count =
+                g_config.input_count,
+
         .output_count =
             g_config.output_count
     };

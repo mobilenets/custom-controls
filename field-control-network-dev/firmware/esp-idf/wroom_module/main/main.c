@@ -11,6 +11,8 @@
 #include "fcn_network.h"
 
 #include "fcn_relay.h"
+#include "fcn_microros.h"
+#include "fcn_input.h"
 
 static const char *TAG = "FCN";
 static fcn_config_t g_config;
@@ -54,7 +56,7 @@ void app_main(void)
         "FCN alive"
     );
  
-    ESP_LOGI(TAG, "Initializing FCN outputs");
+
 
     ESP_LOGI(TAG, "--- FCN configuration ---");
 
@@ -119,12 +121,24 @@ void app_main(void)
         }
     }
 
+    ESP_LOGI(TAG, "Initializing FCN outputs");
+    
     ESP_ERROR_CHECK(fcn_relay_init());
 
     ESP_LOGI(
         TAG,
         "FCN output mask: 0x%02X",
         fcn_relay_get_mask()
+    );
+
+    ESP_LOGI(TAG, "Initializing FCN inputs");
+
+    ESP_ERROR_CHECK(fcn_input_init());
+
+    ESP_LOGI(
+        TAG,
+        "FCN input mask: 0x%02X",
+        fcn_input_get_mask()
     );
 
     ESP_LOGI(TAG, "--- Network subsystem ---");
@@ -149,6 +163,47 @@ void app_main(void)
             TAG,
             "Network initialization failed: %s",
             esp_err_to_name(network_err)
+        );
+    }
+
+    ESP_LOGI(TAG, "--- micro-ROS subsystem ---");
+
+    fcn_microros_config_t microros_config = {
+        .agent_ip =
+            g_config.agent_ip,
+
+        .agent_port =
+            g_config.agent_port,
+
+        .module_id =
+            g_config.module_id,
+
+        .module_name =
+            g_config.module_name,
+
+        .input_count =
+            g_config.input_count,
+
+        .output_count =
+            g_config.output_count
+    };
+
+    esp_err_t microros_err =
+        fcn_microros_start(&microros_config);
+
+    if (microros_err == ESP_OK)
+    {
+        ESP_LOGI(
+            TAG,
+            "micro-ROS manager started"
+        );
+    }
+    else
+    {
+        ESP_LOGE(
+            TAG,
+            "micro-ROS initialization failed: %s",
+            esp_err_to_name(microros_err)
         );
     }
 
