@@ -21,6 +21,8 @@
 #include "fcn_microros.h"
 #include "fcn_status.h"
 
+#include "rs485_relay_driver.h"
+
 static const char *TAG = "FCN";
 
 static fcn_config_t g_config;
@@ -229,6 +231,39 @@ void app_main(void)
             );
         }
     } */
+
+    ESP_LOGI(TAG, "--- RS485 expansion subsystem ---");
+
+    esp_err_t rs485_err = rs485_relay_init();
+
+    if (rs485_err == ESP_OK)
+    {
+        uint8_t rs485_coil_mask = 0;
+
+        if (rs485_relay_detect(&rs485_coil_mask))
+        {
+            ESP_LOGI(
+                TAG,
+                "RS485 expansion available, mask=0x%02X",
+                rs485_coil_mask
+            );
+        }
+        else
+        {
+            ESP_LOGI(
+                TAG,
+                "Continuing without RS485 expansion"
+            );
+        }
+    }
+    else
+    {
+        ESP_LOGE(
+            TAG,
+            "RS485 initialization failed: %s",
+            esp_err_to_name(rs485_err)
+        );
+    }
 
     ESP_LOGI(TAG, "--- Digital input subsystem ---");
 
