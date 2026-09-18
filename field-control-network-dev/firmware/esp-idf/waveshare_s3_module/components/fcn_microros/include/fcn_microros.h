@@ -16,6 +16,8 @@ typedef struct
     uint8_t module_id;
     const char *module_name;
 
+    uint8_t output_count;
+
 } fcn_microros_config_t;
 
 esp_err_t fcn_microros_start(

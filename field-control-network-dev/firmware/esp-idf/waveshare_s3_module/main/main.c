@@ -367,7 +367,10 @@ void app_main(void)
             g_config.module_id,
 
         .module_name =
-            g_config.module_name
+            g_config.module_name,
+
+        .output_count =
+            g_config.output_count
     };
 
     esp_err_t microros_err =

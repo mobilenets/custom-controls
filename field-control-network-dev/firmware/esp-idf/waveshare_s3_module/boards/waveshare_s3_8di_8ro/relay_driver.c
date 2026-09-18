@@ -1,5 +1,6 @@
 #include "fcn_relay.h"
 #include "board_profile.h"
+#include "rs485_relay_driver.h"
 
 #include "driver/i2c_master.h"
 
@@ -269,43 +270,73 @@ esp_err_t fcn_relay_init(void)
 
 esp_err_t fcn_relay_set(uint8_t relay_number, bool on)
 {
-    if (relay_device == NULL) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    if (
-        relay_number == 0 ||
-        relay_number > FCN_ONBOARD_RELAY_COUNT
-    ) {
+    if (relay_number == 0) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    /*
+     * Onboard relay provider.
+     *
+     * FCN relays 1..8 map directly to the
+     * Waveshare onboard I2C relay controller.
+     */
+    if (relay_number <= FCN_ONBOARD_RELAY_COUNT)
+    {
+        if (relay_device == NULL) {
+            return ESP_ERR_INVALID_STATE;
+        }
 
-    uint8_t bit = 1U << (relay_number - 1);
+        uint8_t bit =
+            1U << (relay_number - 1);
 
+        uint8_t new_mask =
+            relay_mask;
 
-    uint8_t new_mask = relay_mask;
+        if (on) {
+            new_mask |= bit;
+        } else {
+            new_mask &= ~bit;
+        }
 
-    if (on) {
-        new_mask |= bit;
-    } else {
-        new_mask &= ~bit;
+        esp_err_t err =
+            relay_write_register(
+                FCN_RELAY_REG_OUTPUT,
+                new_mask
+            );
+
+        if (err != ESP_OK) {
+            return err;
+        }
+
+        relay_mask = new_mask;
+
+        return ESP_OK;
     }
 
+    /*
+     * Expansion provider.
+     *
+     * FCN relays 9..16 map to provider-local
+     * expansion relays 1..8.
+     */
+    if (
+        relay_number <=
+        (FCN_ONBOARD_RELAY_COUNT +
+         FCN_RS485_RELAY_COUNT)
+    )
+    {
+        uint8_t expansion_relay =
+            relay_number -
+            FCN_ONBOARD_RELAY_COUNT;
 
-    esp_err_t err = relay_write_register(
-        FCN_RELAY_REG_OUTPUT,
-        new_mask
-    );
 
-    if (err != ESP_OK) {
-        return err;
+        return rs485_relay_set(
+            expansion_relay,
+            on
+        );
     }
 
-
-    relay_mask = new_mask;
-
-    return ESP_OK;
+    return ESP_ERR_INVALID_ARG;
 }
 
 

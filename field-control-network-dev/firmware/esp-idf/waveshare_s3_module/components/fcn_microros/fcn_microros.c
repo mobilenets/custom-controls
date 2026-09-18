@@ -82,7 +82,7 @@ static char node_name[32];
 static char actionrequest_buffer[ACTIONREQUEST_BUFFER_SIZE];
 
 static uint8_t local_module_id = 0;
-
+static uint8_t local_output_count = 0;
 
 static void reset_ros_handles(void)
 {
@@ -255,12 +255,17 @@ static void actionrequest_callback(const void *msgin)
         return;
     }
 
-    if (relay_number < 1 || relay_number > 8)
+    if (
+        relay_number < 1 ||
+        relay_number > local_output_count
+    )
     {
         ESP_LOGW(
             TAG,
-            "Invalid relay number: %u",
-            relay_number
+            "Invalid relay number: %u "
+            "(configured outputs: %u)",
+            relay_number,
+            local_output_count
         );
 
         return;
@@ -1068,6 +1073,9 @@ esp_err_t fcn_microros_start(
 
     local_module_id =
         config->module_id;
+
+    local_output_count =
+        config->output_count;
 
     BaseType_t task_result =
         xTaskCreate(
