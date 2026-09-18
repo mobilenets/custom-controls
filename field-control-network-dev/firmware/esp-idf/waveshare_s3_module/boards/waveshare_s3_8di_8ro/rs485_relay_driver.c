@@ -10,7 +10,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-
+#include <string.h>
 
 static const char *TAG = "rs485_relay";
 
@@ -21,6 +21,7 @@ static const char *TAG = "rs485_relay";
 
 
 static bool initialized = false;
+
 
 
 /*
@@ -360,6 +361,201 @@ esp_err_t rs485_relay_init(void)
     return ESP_OK;
 }
 
+esp_err_t rs485_relay_set(
+    uint8_t relay_number,
+    bool on
+)
+{
+    if (!initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (
+        relay_number == 0 ||
+        relay_number > FCN_RS485_RELAY_COUNT
+    ) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+
+    /*
+     * FCN provider-local relay numbering is 1..8.
+     * Modbus coil addressing is 0..7.
+     */
+    uint16_t coil_address =
+        (uint16_t)(relay_number - 1);
+
+
+    uint8_t request[8];
+
+    request[0] = RS485_SLAVE_ID;
+    request[1] = 0x05;
+    request[2] = (uint8_t)(coil_address >> 8);
+    request[3] = (uint8_t)(coil_address & 0xFF);
+
+    /*
+     * Modbus Write Single Coil:
+     * FF00 = ON
+     * 0000 = OFF
+     */
+    request[4] = on ? 0xFF : 0x00;
+    request[5] = 0x00;
+
+
+    uint16_t crc = modbus_crc16(
+        request,
+        6
+    );
+
+    request[6] = (uint8_t)(crc & 0xFF);
+    request[7] = (uint8_t)(crc >> 8);
+
+
+    uart_flush_input(RS485_UART_PORT);
+
+    rs485_set_tx(true);
+
+
+    int written = uart_write_bytes(
+        RS485_UART_PORT,
+        request,
+        sizeof(request)
+    );
+
+    if (written != sizeof(request)) {
+
+        rs485_set_tx(false);
+
+        ESP_LOGW(
+            TAG,
+            "Failed to transmit Modbus write request"
+        );
+
+        return ESP_FAIL;
+    }
+
+
+    esp_err_t err = uart_wait_tx_done(
+        RS485_UART_PORT,
+        pdMS_TO_TICKS(100)
+    );
+
+    rs485_set_tx(false);
+
+
+    if (err != ESP_OK) {
+
+        ESP_LOGW(
+            TAG,
+            "UART transmit timeout during relay write"
+        );
+
+        return err;
+    }
+
+
+    /*
+     * Function 0x05 response is an echo of the
+     * complete eight-byte request.
+     */
+    uint8_t response[8] = {0};
+
+    int received = rs485_read_response(
+        response,
+        sizeof(response)
+    );
+
+
+    if (received != sizeof(response)) {
+
+        ESP_LOGW(
+            TAG,
+            "Modbus write response timeout (%d/8 bytes)",
+            received
+        );
+
+        return ESP_ERR_TIMEOUT;
+    }
+
+
+    uint16_t received_crc =
+        (uint16_t)response[6] |
+        ((uint16_t)response[7] << 8);
+
+
+    uint16_t calculated_crc =
+        modbus_crc16(
+            response,
+            6
+        );
+
+
+    if (received_crc != calculated_crc) {
+
+        ESP_LOGW(
+            TAG,
+            "Modbus write CRC mismatch"
+        );
+
+        return ESP_FAIL;
+    }
+
+
+    /*
+     * A successful 0x05 response should echo
+     * the request exactly.
+     */
+    if (memcmp(
+            response,
+            request,
+            sizeof(request)
+        ) != 0) {
+
+        ESP_LOGW(
+            TAG,
+            "Unexpected Modbus write response"
+        );
+
+        return ESP_FAIL;
+    }
+
+
+    ESP_LOGI(
+        TAG,
+        "Expansion relay %u -> %s",
+        relay_number,
+        on ? "ON" : "OFF"
+    );
+
+
+    return ESP_OK;
+}
+
+esp_err_t rs485_relay_get_mask(
+    uint8_t *coil_mask
+)
+{
+    if (!initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (coil_mask == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+
+    if (!modbus_read_coils_8(
+            RS485_SLAVE_ID,
+            0x0000,
+            coil_mask
+        )) {
+
+        return ESP_FAIL;
+    }
+
+
+    return ESP_OK;
+}
 
 bool rs485_relay_detect(uint8_t *coil_mask)
 {
