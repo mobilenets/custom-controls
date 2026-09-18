@@ -17,7 +17,7 @@ static i2c_master_bus_handle_t i2c_bus = NULL;
 static i2c_master_dev_handle_t relay_device = NULL;
 
 static uint8_t relay_mask = 0x00;
-
+static uint8_t expansion_relay_mask = 0;
 
 /*
  * Write one register in the onboard relay controller.
@@ -339,6 +339,71 @@ esp_err_t fcn_relay_set(uint8_t relay_number, bool on)
     return ESP_ERR_INVALID_ARG;
 }
 
+esp_err_t fcn_relay_refresh(void)
+{
+    uint8_t mask = 0;
+
+    esp_err_t err =
+        rs485_relay_get_mask(
+            &mask
+        );
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    expansion_relay_mask = mask;
+
+    return ESP_OK;
+}
+
+int fcn_relay_get(uint8_t relay_number)
+{
+    if (relay_number == 0) {
+        return -1;
+    }
+
+    /*
+     * Onboard relay provider.
+     *
+     * FCN relays 1..8 are represented by
+     * the local onboard relay mask.
+     */
+    if (relay_number <= FCN_ONBOARD_RELAY_COUNT)
+    {
+        uint8_t bit =
+            1U << (relay_number - 1);
+
+        return (relay_mask & bit) ? 1 : 0;
+    }
+
+    /*
+     * Expansion relay provider.
+     *
+     * FCN relays 9..16 map to provider-local
+     * expansion relays 1..8.
+     */
+    if (
+        relay_number <=
+        (FCN_ONBOARD_RELAY_COUNT +
+         FCN_RS485_RELAY_COUNT)
+    )
+    {
+        uint8_t expansion_relay =
+            relay_number -
+            FCN_ONBOARD_RELAY_COUNT;
+
+        uint8_t bit =
+            1U << (expansion_relay - 1);
+
+        return
+            (expansion_relay_mask & bit)
+            ? 1
+            : 0;
+    }
+
+    return -1;
+}
 
 esp_err_t fcn_relay_all_off(void)
 {

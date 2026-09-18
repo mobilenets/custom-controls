@@ -326,28 +326,112 @@ static void publish_modulereturn(void)
         return;
     }
 
-    uint8_t relay_mask =
-        fcn_relay_get_mask();
+    /*
+     * Refresh physical relay state once before
+     * constructing the heartbeat.
+     *
+     * Board/provider code decides how that state
+     * is obtained.
+     */
+    esp_err_t refresh_err =
+        fcn_relay_refresh();
+
+    if (refresh_err != ESP_OK)
+    {
+        ESP_LOGW(
+            TAG,
+            "Relay state refresh failed: %s",
+            esp_err_to_name(refresh_err)
+        );
+    }
 
     uint8_t input_mask =
         fcn_input_get_mask();
 
+    size_t used = 0;
+
+    /*
+     * Module ID and beginning of relay list.
+     */
     int written = snprintf(
         modulereturn_buffer,
         sizeof(modulereturn_buffer),
-        "%u;R:%u,%u,%u,%u,%u,%u,%u,%u;"
-        "I:%u,%u,%u,%u,%u,%u,%u,%u",
-        local_module_id,
+        "%u;R:",
+        local_module_id
+    );
 
-        (relay_mask >> 0) & 0x01,
-        (relay_mask >> 1) & 0x01,
-        (relay_mask >> 2) & 0x01,
-        (relay_mask >> 3) & 0x01,
-        (relay_mask >> 4) & 0x01,
-        (relay_mask >> 5) & 0x01,
-        (relay_mask >> 6) & 0x01,
-        (relay_mask >> 7) & 0x01,
+    if (
+        written < 0 ||
+        (size_t)written >= sizeof(modulereturn_buffer)
+    )
+    {
+        ESP_LOGE(
+            TAG,
+            "/modulereturn buffer overflow"
+        );
 
+        return;
+    }
+
+    used = (size_t)written;
+
+    /*
+     * Relay/output states are dynamic according
+     * to the configured FCN output count.
+     */
+    for (
+        uint8_t relay_number = 1;
+        relay_number <= local_output_count;
+        relay_number++
+    )
+    {
+        int state =
+            fcn_relay_get(relay_number);
+
+        if (state < 0)
+        {
+            ESP_LOGW(
+                TAG,
+                "Unable to read relay %u",
+                relay_number
+            );
+
+            state = 0;
+        }
+
+        written = snprintf(
+            modulereturn_buffer + used,
+            sizeof(modulereturn_buffer) - used,
+            "%s%d",
+            relay_number > 1 ? "," : "",
+            state
+        );
+
+        if (
+            written < 0 ||
+            (size_t)written >=
+                (sizeof(modulereturn_buffer) - used)
+        )
+        {
+            ESP_LOGE(
+                TAG,
+                "/modulereturn buffer overflow"
+            );
+
+            return;
+        }
+
+        used += (size_t)written;
+    }
+
+    /*
+     * Inputs remain the existing eight-input
+     * Waveshare representation for this milestone.
+     */
+    written = snprintf(
+        modulereturn_buffer + used,
+        sizeof(modulereturn_buffer) - used,
+        ";I:%u,%u,%u,%u,%u,%u,%u,%u",
         (input_mask >> 0) & 0x01,
         (input_mask >> 1) & 0x01,
         (input_mask >> 2) & 0x01,
@@ -360,7 +444,8 @@ static void publish_modulereturn(void)
 
     if (
         written < 0 ||
-        written >= sizeof(modulereturn_buffer)
+        (size_t)written >=
+            (sizeof(modulereturn_buffer) - used)
     )
     {
         ESP_LOGE(
@@ -371,8 +456,10 @@ static void publish_modulereturn(void)
         return;
     }
 
+    used += (size_t)written;
+
     modulereturn_msg.data.size =
-        (size_t)written;
+        used;
 
     rcl_ret_t rc =
         rcl_publish(

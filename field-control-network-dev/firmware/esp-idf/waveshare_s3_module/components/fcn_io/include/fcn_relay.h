@@ -22,6 +22,10 @@ esp_err_t fcn_relay_init(void);
  */
 esp_err_t fcn_relay_set(uint8_t relay_number, bool on);
 
+int fcn_relay_get(uint8_t relay_number);
+
+esp_err_t fcn_relay_refresh(void);
+
 /*
  * Set all onboard relays OFF.
  */
