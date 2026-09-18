@@ -6,6 +6,8 @@
 #include "esp_system.h"
 
 
+#include "fcn_relay.h"
+
 static const char *TAG = "FCN";
 
 
@@ -46,4 +48,18 @@ void app_main(void)
         TAG,
         "FCN alive"
     );
+ 
+    ESP_LOGI(TAG, "Initializing FCN outputs");
+
+    ESP_ERROR_CHECK(fcn_relay_init());
+
+    ESP_LOGI(
+        TAG,
+        "FCN output mask: 0x%02X",
+        fcn_relay_get_mask()
+    );
+
+   
+
+
 }
