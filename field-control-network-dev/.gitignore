@@ -45,3 +45,8 @@ managed_components/
 */managed_components/
 
 wifi_credentials.h
+
+
+controller/python/LogicEngine/runtime_status.json
+controller/python/LogicEngine/**/__pycache__/
+controller/python/LogicEngine/**/*.pyc

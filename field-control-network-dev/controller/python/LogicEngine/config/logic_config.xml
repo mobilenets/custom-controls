@@ -1,0 +1,90 @@
+<root>
+  <config>
+    <modules>
+      <module id="1" friendlyName="South Wall Relay Panel" role="lighting" location="South Wall" host="module-1.local" ip="" relayCount="8" inputCount="4" enabled="true" />
+      <module id="6" friendlyName="South Wall Relay Panel" role="lighting" location="South Wall" host="module-6.local" ip="" relayCount="8" inputCount="4" enabled="true" />
+      <module id="7" friendlyName="South Wall Relay Panel" role="lighting" location="South Wall" host="module-7.local" ip="" relayCount="16" inputCount="4" enabled="true" />
+      <module id="3" friendlyName="new module" location="back of houose" host="" ip="" relayCount="8" inputCount="4" enabled="true" role="lights and switch" />
+    </modules>
+    <nodes>
+      <node id="relay1" moduleId="6" kind="relay" index="1" friendlyName="Shop Light Bank A" />
+      <node id="relay2" moduleId="7" kind="relay" index="1" friendlyName="Shop Light Bank B" />
+      <node id="relay3" moduleId="6" kind="relay" index="2" friendlyName="Shop Light Bank c" />
+      <node id="relay4" moduleId="1" kind="relay" index="1" friendlyName="Shop Light Bank d" />
+      <node id="relay5" moduleId="7" kind="relay" index="10" friendlyName="Shop Light Bank e" />
+      <node id="switch1" moduleId="6" kind="input" index="1" friendlyName="Door Switch" />
+      <node id="switch2" moduleId="1" kind="input" index="0" friendlyName="Manual Switch 2" />
+      <node id="pir1" moduleId="1" kind="input" index="3" friendlyName="PIR 1" />
+      <node id="pir2" moduleId="1" kind="input" index="4" friendlyName="PIR 2" />
+      <node id="2" moduleId="3" kind="relay" index="0" friendlyName="new lights" />
+    </nodes>
+    <groups>
+      <group id="motion" aggregation="any">
+        <member ref="pir1" />
+        <member ref="pir2" />
+      </group>
+      <group id="shop_lights" aggregation="any">
+        <member ref="relay1" />
+        <member ref="relay2" />
+        <member ref="relay3" />
+        <member ref="relay4" />
+        <member ref="relay5" />
+      </group>
+      <group id="manual2" aggregation="any">
+        <member ref="switch2" />
+      </group>
+      <group id="manual" aggregation="any">
+        <member ref="switch1" />
+      </group>
+      <group id="office_lights" aggregation="any">
+        <member ref="2" />
+      </group>
+    </groups>
+    <logicEngine>
+      <logicRecords>
+        <logicRecord
+            id="lr_motion_pir1"
+            recordType="motion_hold"
+            outputGroup="shop_lights"
+            priority="50"
+            operator="AND"
+            desiredState="on"
+            holdSeconds="60">
+          <condition id="pir1_rise" source="pir1" operator="rising_edge" />
+          <condition id="override_not_active" source="shop_lights_override" operator="equals" value="false" />
+        </logicRecord>
+        <logicRecord
+            id="lr_motion_pir2"
+            recordType="motion_hold"
+            outputGroup="shop_lights"
+            priority="50"
+            operator="AND"
+            desiredState="on"
+            holdSeconds="120">
+          <condition id="pir2_rise" source="pir2" operator="rising_edge" />
+          <condition id="override_not_active" source="shop_lights_override" operator="equals" value="false" />
+        </logicRecord>
+        <logicRecord id="lr_manual_on" outputGroup="shop_lights" priority="200" operator="AND" desiredState="on">
+          <condition id="switch_rise" source="manual" operator="rising_edge" />
+        </logicRecord>
+        <logicRecord id="lr_manual_off" outputGroup="shop_lights" priority="200" operator="AND" desiredState="off">
+          <condition id="switch_fall" source="manual" operator="falling_edge" />
+        </logicRecord>
+        <logicRecord id="lr_manual2_on" outputGroup="shop_lights" priority="200" operator="AND" desiredState="on">
+          <condition id="switch2_rise" source="manual2" operator="rising_edge" />
+        </logicRecord>
+        <logicRecord id="lr_manual2_off" outputGroup="shop_lights" priority="200" operator="AND" desiredState="off">
+          <condition id="switch2_fall" source="manual2" operator="falling_edge" />
+        </logicRecord>
+        <logicRecord id="lr_schedule_on" outputGroup="shop_lights" priority="100" operator="AND" desiredState="on">
+          <condition id="weekday_only_on" source="clock" operator="day_in" value="mon,tue,wed,thu,fri" />
+          <condition id="morning_on_time" source="clock" operator="time_equals" value="07:10" />
+        </logicRecord>
+        <logicRecord id="lr_schedule_off" outputGroup="shop_lights" priority="100" operator="AND" desiredState="off">
+          <condition id="weekday_only_off" source="clock" operator="day_in" value="mon,tue,wed,thu,fri" />
+          <condition id="evening_off_time" source="clock" operator="time_equals" value="17:00" />
+        </logicRecord>
+      </logicRecords>
+    </logicEngine>
+  </config>
+</root>
